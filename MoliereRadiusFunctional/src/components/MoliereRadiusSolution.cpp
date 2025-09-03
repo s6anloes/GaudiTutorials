@@ -48,10 +48,6 @@ public:
         barycentre_x /= totalEnergy;
         barycentre_y /= totalEnergy;
 
-        struct HitData {
-            double r;
-            double energy;
-        };
         std::vector<HitData> radialHits;
 
         for (const auto& hit : input) {
@@ -83,6 +79,12 @@ public:
 
         
     }
+
+private:
+    struct HitData {
+        double r;      // Radius from barycentre
+        double energy; // Energy of the hit
+    };
 };
 
 DECLARE_COMPONENT(MoliereRadiusSolution)
