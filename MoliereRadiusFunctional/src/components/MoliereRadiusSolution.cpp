@@ -1,6 +1,9 @@
 // k4FWCore
 #include "k4FWCore/Consumer.h"
 
+// podio
+#include "podio/UserDataCollection.h"
+
 // edm4hep
 #include "edm4hep/SimCalorimeterHitCollection.h"
 
@@ -10,51 +13,41 @@
 #include <cmath>
 
 struct MoliereRadiusSolution final
-    : k4FWCore::Consumer<void(const edm4hep::SimCalorimeterHitCollection&)> {
+    : k4FWCore::Consumer<
+        void (
+            const edm4hep::SimCalorimeterHitCollection&,
+            const std::vector<const podio::UserDataCollection<double>*>&,
+            const podio::UserDataCollection<double>&
+        )
+    > {
 
 public:
     // Constructor
     MoliereRadiusSolution(const std::string& name, ISvcLocator* svcLoc)
-        : Consumer(name, 
-                   svcLoc, 
-                   KeyValues("InputCaloHitCollection", {"simplecaloRO"})) {}
+        : Consumer(
+            name, 
+            svcLoc,
+            {
+                KeyValues("InputCaloHitCollection", {"simplecaloRO"}),
+                KeyValues("InputBarycenter", {"Barycenter"}),
+                KeyValues("InputTotalEnergy", {"TotalEnergy"})
+            }
+        ) {}
 
-    
-    void operator()(const edm4hep::SimCalorimeterHitCollection& input) const override {
 
-        // Calcualte the Moliere radius from the simhits
+    void operator()(const edm4hep::SimCalorimeterHitCollection& InputCaloSimHitCollection,
+                    const std::vector<const podio::UserDataCollection<double>*>& InputBarycenter,
+                    const podio::UserDataCollection<double>& InputTotalEnergy) const override {
 
-        double barycentre_x = 0.0;
-        double barycentre_y = 0.0;
-        double totalEnergy = 0.0;
-
-        for (const auto& simhit: input) {
-            // Calculate the shower barycentre in x and y
-            double x = simhit.getPosition().x;
-            double y = simhit.getPosition().y;
-
-            double energy = simhit.getEnergy();
-
-            barycentre_x += x * energy;
-            barycentre_y += y * energy;
-            totalEnergy += energy;
-        }
-
-        if (totalEnergy == 0.0) {
-            info() << "Total energy is zero; cannot compute Moliere radius." << endmsg;
-            return;
-        }
-
-        barycentre_x /= totalEnergy;
-        barycentre_y /= totalEnergy;
-
-        struct HitData {
-            double r;
-            double energy;
-        };
         std::vector<HitData> radialHits;
 
-        for (const auto& hit : input) {
+        double barycentre_x = InputBarycenter[0]->at(0);
+        double barycentre_y = InputBarycenter[1]->at(0);
+        double totalEnergy = InputTotalEnergy.at(0);
+
+        std::cout << "Barycentre: (" << barycentre_x << ", " << barycentre_y << "), Total Energy: " << totalEnergy << std::endl;
+
+        for (const auto& hit : InputCaloSimHitCollection) {
             const auto& pos = hit.getPosition();
             double dx = pos.x - barycentre_x;
             double dy = pos.y - barycentre_y;
@@ -83,6 +76,12 @@ public:
 
         
     }
+
+private:
+    struct HitData {
+        double r;      // Radius from barycentre
+        double energy; // Energy of the hit
+    };
 };
 
 DECLARE_COMPONENT(MoliereRadiusSolution)
